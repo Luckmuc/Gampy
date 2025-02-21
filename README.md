@@ -24,3 +24,8 @@ To run a game:
 python3 games/game_name.py
 ```
 ### if there appears an error, check it and propably, you will have to install other packages with pip
+### tip: if youre on linux and you can't install it because pip gives an error message, add --break-system-packages at the end of the command.
+
+Games created by now:
+- SubwaySurfer (very simplified)
+
