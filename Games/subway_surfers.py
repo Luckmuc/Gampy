@@ -1,109 +1,142 @@
 import pygame
-import random
-import time
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+from OpenGL.GLU import *
+import math
 
 # Initialisierung
 pygame.init()
 
-# Spiel-Parameter
+# Fenstergröße
 screen_width = 800
 screen_height = 600
-screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption('Subway Surfers (Simplified)')
+screen = pygame.display.set_mode((screen_width, screen_height), DOUBLEBUF | OPENGL)
+pygame.display.set_caption('Subway Surfers 3D')
 
-# Farben
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
+# Kamera- und Charakterparameter
+player_x, player_y, player_z = 0, 0, 5
+player_speed = 0.1
+jumping = False
+jump_height = 0.0
+gravity = 0.02
+jump_strength = 0.3
 
-# Charakter- und Hindernisparameter
-player_width = 50
-player_height = 50
-player_x = screen_width / 2 - player_width / 2
-player_y = screen_height - player_height - 10
-player_speed = 5
+# Setup der Perspektive
+gluPerspective(45, (screen_width / screen_height), 0.1, 50.0)
+glTranslatef(0.0, 0.0, -5)
 
-obstacle_width = 50
-obstacle_height = 50
-obstacle_speed = 5
-obstacles = []
+# Funktion, um den Spieler als Würfel zu zeichnen
+def draw_player():
+    glBegin(GL_QUADS)
+    # Vorderseite
+    glColor3f(1, 0, 0)
+    glVertex3f(-0.25, -0.25, 0.25)
+    glVertex3f(0.25, -0.25, 0.25)
+    glVertex3f(0.25, 0.25, 0.25)
+    glVertex3f(-0.25, 0.25, 0.25)
 
-# Spiel-Loop
-clock = pygame.time.Clock()
+    # Rückseite
+    glVertex3f(-0.25, -0.25, -0.25)
+    glVertex3f(-0.25, 0.25, -0.25)
+    glVertex3f(0.25, 0.25, -0.25)
+    glVertex3f(0.25, -0.25, -0.25)
 
-font = pygame.font.SysFont("Arial", 30)
+    # Oben
+    glVertex3f(-0.25, 0.25, -0.25)
+    glVertex3f(-0.25, 0.25, 0.25)
+    glVertex3f(0.25, 0.25, 0.25)
+    glVertex3f(0.25, 0.25, -0.25)
 
-def draw_player(x, y):
-    pygame.draw.rect(screen, RED, (x, y, player_width, player_height))
+    # Unten
+    glVertex3f(-0.25, -0.25, -0.25)
+    glVertex3f(0.25, -0.25, -0.25)
+    glVertex3f(0.25, -0.25, 0.25)
+    glVertex3f(-0.25, -0.25, 0.25)
 
-def draw_obstacles(obstacles):
-    for obstacle in obstacles:
-        pygame.draw.rect(screen, BLACK, (obstacle[0], obstacle[1], obstacle_width, obstacle_height))
+    # Rechts
+    glVertex3f(0.25, -0.25, -0.25)
+    glVertex3f(0.25, 0.25, -0.25)
+    glVertex3f(0.25, 0.25, 0.25)
+    glVertex3f(0.25, -0.25, 0.25)
 
-def move_obstacles(obstacles):
-    for obstacle in obstacles:
-        obstacle[1] += obstacle_speed
+    # Links
+    glVertex3f(-0.25, -0.25, -0.25)
+    glVertex3f(-0.25, -0.25, 0.25)
+    glVertex3f(-0.25, 0.25, 0.25)
+    glVertex3f(-0.25, 0.25, -0.25)
+    glEnd()
 
-def check_collision(player_x, player_y, obstacles):
-    for obstacle in obstacles:
-        if player_x < obstacle[0] + obstacle_width and player_x + player_width > obstacle[0]:
-            if player_y < obstacle[1] + obstacle_height and player_y + player_height > obstacle[1]:
-                return True
-    return False
+# Funktion, um einen Zug zu zeichnen (einfacher Block)
+def draw_train(x_position):
+    glPushMatrix()
+    glTranslatef(x_position, 0, 0)
+    glColor3f(0, 0, 1)
+    glBegin(GL_QUADS)
+    for z in [-0.5, 0.5]:
+        for y in [-0.25, 0.25]:
+            glVertex3f(-1, y, z)
+            glVertex3f(1, y, z)
+            glVertex3f(1, -y, z)
+            glVertex3f(-1, -y, z)
+    glEnd()
+    glPopMatrix()
 
-def display_score(score):
-    score_text = font.render("Score: " + str(score), True, WHITE)
-    screen.blit(score_text, (10, 10))
-
+# Hauptspiel-Loop
 def game_loop():
-    global player_x, player_y, obstacles
+    global player_x, player_y, player_z, jumping, jump_height
+    run = True
+    clock = pygame.time.Clock()
 
-    running = True
-    score = 0
-    while running:
-        screen.fill(WHITE)
-
-        # Ereignisse
+    while run:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                run = False
 
-        # Tastensteuerung
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] and player_x > 0:
+
+        # Bewegungssteuerung
+        if keys[K_a]:
             player_x -= player_speed
-        if keys[pygame.K_RIGHT] and player_x < screen_width - player_width:
+        if keys[K_d]:
             player_x += player_speed
-        if keys[pygame.K_UP] and player_y > 0:
-            player_y -= player_speed
-        if keys[pygame.K_DOWN] and player_y < screen_height - player_height:
-            player_y += player_speed
+        if keys[K_w]:
+            player_z -= player_speed
+        if keys[K_s]:
+            player_z += player_speed
 
-        # Hindernisse erzeugen
-        if random.random() < 0.05:
-            obstacle_x = random.randint(0, screen_width - obstacle_width)
-            obstacles.append([obstacle_x, -obstacle_height])
+        # Sprungsteuerung
+        if keys[K_SPACE] and not jumping:
+            jumping = True
+            jump_height = 0.3
 
-        # Hindernisse bewegen
-        move_obstacles(obstacles)
+        if jumping:
+            player_y += jump_height
+            jump_height -= gravity
+            if player_y <= 0:
+                jumping = False
+                player_y = 0
 
-        # Kollision überprüfen
-        if check_collision(player_x, player_y, obstacles):
-            running = False
+        # Kamera-Position
+        glLoadIdentity()
+        glTranslatef(0.0, 0.0, -5)
+        glRotatef(20, 1, 0, 0)  # Kamera leicht nach unten gerichtet
+        glTranslatef(0.0, 0.0, 5)
 
-        # Hindernisse entfernen, die außerhalb des Bildschirms sind
-        obstacles = [obstacle for obstacle in obstacles if obstacle[1] < screen_height]
+        # Szene zeichnen
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        # Anzeige aktualisieren
-        draw_player(player_x, player_y)
-        draw_obstacles(obstacles)
-        display_score(score)
+        # Zeichne Züge
+        draw_train(-3)
+        draw_train(3)
 
-        score += 1
-        pygame.display.update()
+        # Zeichne Spieler
+        draw_player()
+
+        pygame.display.flip()
         clock.tick(60)
+
+    pygame.quit()
 
 # Spiel starten
 game_loop()
-
-pygame.quit()
