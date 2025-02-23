@@ -3,7 +3,6 @@
 Requierments:
 - Python3 installed
 - Pygame installed (pip install pygame)
-- OpenGL (pip install OpenGL)
 
 first, clone the repo:
 ```bash
